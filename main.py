@@ -25,3 +25,6 @@ def log_gps():
 
 if __name__=='__main__':
     log_wifi('./wifi_logger.sh')
+    log_gps()
+    all_led = LED(27)
+    all_led.on()
