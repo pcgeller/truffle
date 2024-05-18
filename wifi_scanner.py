@@ -57,15 +57,17 @@ class WifiScanner(threading.Thread):
     def stop(self):
         self._stop_event.set()
 
-# Example usage
-scanner = WifiScanner(interval=10)
-scanner.start()
 
-# Simulate running the scanning process for a certain period
-time.sleep(60)
+if __name__ == '__main__':
+    # Example usage
+    scanner = WifiScanner(interval=10)
+    scanner.start()
 
-# Stop the Wi-Fi scanner
-scanner.stop()
-scanner.join()
+    # Simulate running the scanning process for a certain period
+    time.sleep(60)
 
-print("Wi-Fi scanning stopped.")
+    # Stop the Wi-Fi scanner
+    scanner.stop()
+    scanner.join()
+
+    print("Wi-Fi scanning stopped.")

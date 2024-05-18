@@ -1,5 +1,6 @@
 from gpiozero import LED
 from time import sleep
+import threading
 
 class led:
     def __init__(self, pin):
@@ -16,10 +17,10 @@ class led:
         while not self._stop_event.is_set():
             self.light.on()
             print(f"GPIO pin {self.pin} HIGH")
-            time.sleep(0.5)
+            sleep(0.5)
             self.light.off()
             print(f"GPIO pin {self.pin} LOW")
-            time.sleep(0.5)
+            sleep(0.5)
 
     def start_blinking(self):
         self.thread.start()
