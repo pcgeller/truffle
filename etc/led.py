@@ -11,6 +11,7 @@ class led:
     def _setup_gpio(self):
         self.light = LED(self.pin)
         print(f"Setting up GPIO pin {self.pin} as output")
+        print(f'stop event is : {self._stop_event.is_set()}')
 
     def _blink(self):
         self._setup_gpio()
@@ -28,3 +29,4 @@ class led:
     def stop_blinking(self):
         self._stop_event.set()
         self.thread.join()
+

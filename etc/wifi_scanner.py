@@ -5,14 +5,14 @@ import time
 import csv
 from datetime import datetime
 
-class WifiScanner(threading.Thread):
+class WifiScanner:
     def __init__(self, interval=10, output_file='wifi_scan_results.csv'):
-        super().__init__()
         self.interval = interval
         self.output_file = output_file
         self._stop_event = threading.Event()
+        self.thread = threading.Thread(target=self._scan)
 
-    def run(self):
+    def _scan(self):
         while not self._stop_event.is_set():
             try:
                 output = subprocess.check_output(['iwlist', 'wlan0', 'scan'], encoding='utf-8')

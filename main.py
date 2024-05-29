@@ -1,30 +1,32 @@
-import subprocess
-from time import sleep
-from gps_logger import log_gps_data
-from gpiozero import LED
+from sensors import GPSSensor, WiFiSensor
 import threading
 
-gps_led = LED(22)
-wifi_led = LED(17)
-
-def log_wifi(script_path):
-    wifi_led.on()
-    sleep(1)
-    wifi_led.off()
-
-    subprocess.Popen('sh', script_path, '&')
-
-def log_gps():
-    gps_led.on()
-    sleep(1)
-    gps_led.off()
-    t = threading.Thread(target=log_gps_data,
-                         name='logging_gps')  # < Note that I did not actually call the function, but instead sent it as a parameter
-    t.daemon=True
-    t.start()
+def listen_for_cancel(_stop_event, *args):
+    while not _stop_event.is_set():
+        user_input = input("Press 'q' to quit: ")
+        if user_input.lower() == 'q':
+            for a in args:
+                print(f'Cancelling: {a}')
+                a._stop_event.set()
 
 if __name__=='__main__':
-    log_wifi('./wifi_logger.sh')
-    log_gps()
-    all_led = LED(27)
-    all_led.on()
+    import logging
+
+    logging.basicConfig(
+        filename='main.log',  # Name of the log file
+        level=logging.DEBUG,  # Minimum log level to capture
+        format='%(asctime)s - %(levelname)s - %(message)s',  # Log message format
+        filemode='w'  # Mode to open the file: 'w' for write, 'a' for append
+    )
+    gps_led = 22
+    wifi_led = 17
+
+    cancel_event = threading.Event()
+
+    wifi = WiFiSensor(f'./logs/wifi_output.txt', wifi_led, 10)
+    gps = GPSSensor(f'./logs/gps_output.txt', gps_led, 10)
+    wifi.start()
+    gps.start()
+    listener_thread = threading.Thread(target=listen_for_cancel, args=(cancel_event, wifi))
+
+
