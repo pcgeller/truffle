@@ -1,28 +1,24 @@
 import threading
 import logging
-
 import gpiozero.exc
 from gpiozero import LED
 from time import sleep
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
 class Sensor:
-    def __init__(self, output_file, pin):
+    def __init__(self, output_file, pin, on_blink_timing=1, off_blink_timing=1):
         """
         A sensor represents a thread that is used to log and indicate on a data feed type.
         :parameter output_file (string): the name of the output file
-        :parameter pin (int): the pin number for the LED.
+        :parameter pin (int): the pin for the LED.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
         self.output_file = output_file
         self._stop_event = threading.Event()
         self.thread = threading.Thread(target=self._run_sensor)
         self.pin = pin
+        self._setup_gpio()
 
-    def _run(self):
+    def run(self):
         """
         Intended to be overridden by subclasses.
         :return: None
@@ -35,53 +31,53 @@ class Sensor:
         Used to start the sensor thread. The target function of the call to Thread.
         :return: None
         """
-        self.logger.debug("Starting sensor thread.")
+        self.logger.debug(f"Starting sensor run for {self.__class__.__name__}")
+        runner = threading.Thread(target=self.run)
+        runner.start()
+        self.logger.debug("Sensor run thread complete.")
 
-        while not self._stop_event.is_set():
-            blinking_light = threading.Thread(target=self._blink())
-            blinking_light.start()
-            blinking_light.join()
-
-        while not self._stop_event.is_set():
-            self._run()
 
 
     def _setup_gpio(self):
         """
-        Used to setup the GPIO LED.
+        Used to set up the GPIO LED.
         :return:
         """
         try:
             self.light = LED(self.pin)
-            print(f"Setting up GPIO pin {self.pin} as output")
-            print(f'Stop event is : {self._stop_event.is_set()}')
+            self.logger.info(f"Setting up GPIO pin {self.pin} as output")
         except gpiozero.exc.BadPinFactory as pin_factory_err:
             print('Error starting pin.  Perhaps you\'re not on the remote sensor and are using a local terminal.')
             print(pin_factory_err)
             self.logger.error(pin_factory_err)
 
-    def _blink(self):
+    def _blink(self, on_timing=.5, off_timing=.5):
         """
         Blink the light with timing.
         :return:
         """
-        self._setup_gpio()
-        while not self._stop_event.is_set():
-            self.light.on()
-            self.logger.debug(f"GPIO pin {self.pin} HIGH")
-            sleep(0.5)
-            self.light.off()
-            logger.debug(f"GPIO pin {self.pin} LOW")
-            sleep(0.5)
+        if self.light is None:
+            self.logger.debug('Light not initialized.  Initializing.')
+            self._setup_gpio()
+            self.logger.debug('Light initialized.')
+
+        self.light.on()
+        self.logger.debug(f"GPIO pin {self.pin} HIGH")
+        sleep(on_timing)
+        self.light.off()
+        self.logger.debug(f"GPIO pin {self.pin} LOW")
+        sleep(off_timing)
 
     def start(self):
-        logger.debug('Starting sensor thread.')
+        self.logger.info('Starting sensor thread.')
         self.thread.start()
 
     def stop(self):
-        logger.debug('Stopping sensor thread.')
+        self.logger.info('Stopping sensor thread.')
         self._stop_event.set()
+
 def main():
+    logger = logging.getLogger(__name__)
     logger.debug('Starting main loop')
     print('Starting sensor thread')
     sensor = Sensor(output_file='sensor.log', pin=0)

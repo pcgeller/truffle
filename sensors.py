@@ -3,8 +3,10 @@ from datetime import datetime
 import subprocess
 import re
 import csv
-import gps
+from gps3 import gps3
 import time
+import os
+from time import sleep
 
 class WiFiSensor(Sensor):
     def __init__(self, output_file, pin, interval):
@@ -12,16 +14,21 @@ class WiFiSensor(Sensor):
         self.name = 'WiFi Sensor'
         self.interval = interval
 
-    def _run(self):
+    def run(self):
         while not self._stop_event.is_set():
+            self.logger.info('wifi scanning')
+            print('wifi scanning')
             try:
+                self._blink(.2, .2)
                 output = subprocess.check_output(['iwlist', 'wlan0', 'scan'], encoding='utf-8')
                 scan_results = self.parse_output(output)
+                self.logger.info('Scan results: {}'.format(scan_results))
                 self.save_to_csv(scan_results)
+                self.logger.info('Saving results to csv file.')
             except subprocess.CalledProcessError as e:
                 print(f"Failed to scan Wi-Fi networks: {e}")
 
-            self._stop_event.wait(self.interval)
+            time.sleep(self.interval)
 
     def parse_output(self, output):
         networks = []
@@ -42,6 +49,7 @@ class WiFiSensor(Sensor):
     def save_to_csv(self, scan_results):
         file_exists = False
         try:
+            self.logger.info(f'Output file is set to {self.output_file} and {os.getcwd()}')
             with open(self.output_file, 'r') as file:
                 file_exists = True
         except FileNotFoundError:
@@ -60,25 +68,56 @@ class GPSSensor(Sensor):
         self.name = 'GPS Sensor'
         self.interval = interval
 
-    def _run(self):
-        # Open a file to save the data
-        with open(self.output_file, 'a') as file:
-            # Start the GPS session
-            session = gps.gps('localhost', '2947')
-            session.stream(gps.WATCH_ENABLE | gps.WATCH_NEWSTYLE)
+    def run(self):
+        gps_socket = gps3.GPSDSocket()
+        data_stream = gps3.DataStream()
+        gps_socket.connect()
+        gps_socket.watch()
+        self.logger.info('Getting read to run GPS.')
+        with open(self.output_file, mode='a', newline='') as csvfile:
+            fieldnames = ['timestamp', 'latitude', 'longitude', 'altitude', 'speed', 'gps_time']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            # Log GPS data
+            for new_data in gps_socket:
+                self._blink(1, 1)
+                if new_data:
+                    data_stream.unpack(new_data)
+                    latitude = data_stream.TPV['lat']
+                    longitude = data_stream.TPV['lon']
+                    altitude = data_stream.TPV['alt']
+                    speed = data_stream.TPV['speed']
+                    gps_time = data_stream.TPV['time']
+                    timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
+                    print('Logging GPS Data')
+                    writer.writerow({'timestamp': timestamp,
+                                     'latitude': latitude,
+                                     'longitude': longitude,
+                                     'altitude': altitude,
+                                     'speed': speed,
+                                     'gps_time': gps_time})
+                    csvfile.flush()
+                    self.logger.info(f"Latitude: {latitude}, Longitude: {longitude}, Altitude: {altitude}, Speed: {speed}")
+                    time.sleep(self.interval)
+                if self._stop_event.is_set():
+                    self.logger.info('Stopping gps sensor')
+                    csvfile.close()
+                    self.logger.info(f'CSV File is closed. :{csvfile.closed}')
+ #                   gps_socket.close()
+  #                  self.logger.info(f'GPSD Socket is closed.')
+                    break
 
-            try:
-                while not self._stop_event.is_set():
-                    report = session.next()
-                    # Wait for a 'TPV' report and check if it has the 'lat' attribute
-                    if report['class'] == 'TPV':
-                        if hasattr(report, 'lat') and hasattr(report, 'lon'):
-                            # Log the latitude and longitude
-                            file.write(
-                                f"{time.strftime('%Y-%m-%d %H:%M:%S')} - Latitude: {report.lat}, Longitude: {report.lon}\n")
-                            file.flush()
-                    time.sleep(10)  # Log every 10 seconds
-            except KeyError:
-                pass  # Ignore reports that do not contain position data
-            except KeyboardInterrupt:
-                exit()  # Gracefully handle Ctrl+C
+
+class BluetoothSensor(Sensor):
+    def __init__(self, output_file, pin, interval):
+        super().__init__(output_file, pin)
+        self.name = 'Bluetooth Sensor'
+        self.interval = interval
+        self.logger.info('Bluetooth sensor initialized.')
+
+    def run(self):
+
+        pass
+
+
+

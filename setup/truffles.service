@@ -1,0 +1,14 @@
+[Unit]
+Description=Truffle
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python /home/pcgeller/projects/truffle/main.py
+WorkingDirectory=/home/pcgeller/projects/truffle/main.py
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pcgeller
+
+[Install]
+WantedBy=multi-user.target
