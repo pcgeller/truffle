@@ -1,50 +1,57 @@
 import threading
-import subprocess
-import os
-import datetime
+import time
+import bluetooth
+import pandas as pd
 
 
-def log_bluetooth_signals(output_file):
-    cmd = ['sudo', 'hcitool', 'lescan', '--duplicates']
-    with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as lescan_proc:
+# Function to discover Bluetooth devices and return their data
+def discover_bluetooth_devices():
+    print("Searching for Bluetooth devices...")
+    devices = bluetooth.discover_devices(duration=8, lookup_names=True, flush_cache=True, lookup_class=True)
+    device_list = []
+
+    for addr, name, device_class in devices:
         try:
-            cmd = ['sudo', 'hcidump', '--raw']
-            with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as hcidump_proc:
-                with open(output_file, 'w') as f:
-                    while True:
-                        line = hcidump_proc.stdout.readline()
-                        if not line:
-                            break
-                        timestamp = datetime.datetime.now().isoformat()
-                        f.write(f"{timestamp}: {line.decode('utf-8')}")
-        except KeyboardInterrupt:
-            lescan_proc.terminate()
-            hcidump_proc.terminate()
+            device_info = {
+                "Address": addr,
+                "Name": name,
+                "Device Class": device_class,
+                "Timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+            }
+            device_list.append(device_info)
+        except Exception as e:
+            print(f"Error retrieving device info: {e}")
+
+    return device_list
 
 
-def start_logging(output_file):
-    log_thread = threading.Thread(target=log_bluetooth_signals, args=(output_file,))
-    log_thread.daemon = True
-    log_thread.start()
-    return log_thread
+# Function to log Bluetooth data at regular intervals
+def log_bluetooth_data(filename, interval):
+    while True:
+        devices = discover_bluetooth_devices()
+        if devices:
+            df = pd.DataFrame(devices)
+            df.to_csv(filename, mode='a', header=not pd.io.common.file_exists(filename), index=False)
+        time.sleep(interval)
 
 
-def main():
-    output_file = '/path/to/bluetooth_log.txt'
-
-    if not os.path.exists(os.path.dirname(output_file)):
-        os.makedirs(os.path.dirname(output_file))
-
-    print(f"Starting Bluetooth logging, output file: {output_file}")
-    log_thread = start_logging(output_file)
-
-    try:
-        while True:
-            # Main program loop (perform other tasks here)
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("Program terminated")
+# Create a thread for logging Bluetooth data
+def create_logging_thread(filename, interval):
+    logging_thread = threading.Thread(target=log_bluetooth_data, args=(filename, interval))
+    logging_thread.daemon = True
+    logging_thread.start()
 
 
 if __name__ == "__main__":
-    main()
+    output_file = "./output/bluetooth_log.csv"
+    log_interval = 10 #seconds
+
+    print(f"Starting Bluetooth logging thread, logging to {output_file} every {log_interval} seconds...")
+    create_logging_thread(output_file, log_interval)
+
+    # Main thread can perform other tasks or simply wait
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Exiting program.")
