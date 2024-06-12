@@ -118,6 +118,3 @@ class BluetoothSensor(Sensor):
     def run(self):
 
         pass
-
-
-
